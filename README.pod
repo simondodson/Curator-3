@@ -1,0 +1,51 @@
+
+=head1 NAME
+
+Curator - Manage a media collection
+
+=head1 DESCRIPTION
+
+Curator is a system of scripts, modules, and daemons to manage a media collection.
+
+=head1 STATUS
+
+This is very preliminary software. You will most likely have to read the source to be
+able to use it.
+
+=head1 SCRIPTS
+
+Right now, all that exists are some scripts to make working with media a bit easier.
+
+=head2 extract.pl
+
+    extract.pl <destination> <source> [<source> ...]
+
+This script will extract any recognized file. It recursively searches every <source> directory
+and puts the results in <destination>.
+
+=head2 rip.pl
+
+    rip.pl <source>
+
+This script uses HandBrakeCLI to transcode video files to the configured preset. It puts its
+output in C<~/To Sort>
+
+=head2 epub.pl
+
+    epub.pl [--comic] <destination> <source [<source> ...]
+
+This script will build an EPUB out of a directory of images.
+
+The C<--comic> flag will apply some heuristics to make double-wide pages and rotated pages
+look the way they should.
+
+=head1 DAEMONS
+
+Eventually I want the entire process of obtaining, transforming, organizing, and storing media
+to be handled completely by Curator. This will involve Curator daemons on multiple hosts in a
+network (one on my media center PC that does the transforming, one on my laptop that does the
+obtaining).
+
+Since my laptop could leave my home network, it will have to be able to recognize and wait until
+I'm back home to talk to the media center PC.
+
