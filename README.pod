@@ -49,3 +49,15 @@ obtaining).
 Since my laptop could leave my home network, it will have to be able to recognize and wait until
 I'm back home to talk to the media center PC.
 
+=head1 COPYRIGHT
+
+Copyright 2012 - Doug Bell C<preaction@me.com>
+
+=head1 LICENSE
+
+This distribution is free software; you can redistribute it and/or modify it under the same terms
+as Perl 5.14.2.
+
+This program is distributed in the hope that it will be
+useful, but without any warranty; without even the implied
+warranty of merchantability or fitness for a particular purpose.
