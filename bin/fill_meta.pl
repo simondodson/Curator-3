@@ -24,7 +24,15 @@ for my $dest ( @destinations ) {
     }
     if ( $comic ) {
         # Determine issue number from destination folder
-        my ( $issue ) = basename( $dest ) =~ /#(\d+)/;
+        my $issue;
+        my $title = basename( $dest );
+        if ( $title =~ /#/ ) {
+            ( $issue ) = $title =~ /#(\d+)/;
+        }
+        else {
+            # If no #, the first number we see
+            ( $issue ) = $title =~ /(\d+)/;
+        }
         $meta->{title} =~ s/#\d+/#$issue/;
     }
     DumpFile( $dest_file, $meta );
