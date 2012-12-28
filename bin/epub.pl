@@ -86,7 +86,7 @@ sub make_epub {
         warn "No metadata file found in $source_dir\n";
     }
 
-    my ( %double, %rotate );
+    my ( %double, %rotate, $add_blank );
     # In comic mode, try to find double-wide pages and rotated pages
     if ( $comic ) {
         # First find the most likely candidate for the height/width of the book
@@ -104,6 +104,7 @@ sub make_epub {
         my $stddev_height = sqrt( sum( map { ( $_ - $avg_height ) ** 2 } @height ) / @height );
 
         # Now look for outliers
+        my $count = 0;
         for my $img ( @images ) {
             my $imager = Imager->new( file => $img );
             my $h = $imager->getheight;
@@ -117,11 +118,21 @@ sub make_epub {
             elsif ( near( $h, $avg_height, 3 * $stddev_height ) && near( $w / 2, $avg_width, 0.05 * $avg_width ) ) {
                 warn "  Double: $img \n\t(w: $w, a: $avg_width, s: $stddev_width) \n\t(h: $h, a: $avg_height, s: $stddev_height )\n";
                 $double{ $img }++;
+                # Do we need to add a blank page after the cover?
+                # Odd pages are on the left, even pages are on the right
+                # If the double page starts on the right, add one just after the cover
+                if ( $count % 2 == 0 ) {
+                    $add_blank = 1;
+                    warn "  Double page offset, need to add a blank page\n";
+                    $count++; # We just added a page right after the cover
+                }
+                $count++; # Extra counter, we added two pages
             }
             # - Outlier: Height or width not within 2 stddev of avg
             elsif ( not near( $h, $avg_height, 3 * $stddev_height ) or not near( $w, $avg_width, 3 * $stddev_width ) ) {
                 warn "  Outlier: $img \n\t(w: $w, a: $avg_width, s: $stddev_width) \n\t(h: $h, a: $avg_height, s: $stddev_height )\n";
             }
+            $count++;
         }
     }
 
@@ -146,6 +157,23 @@ sub make_epub {
             href => $image_src,
             imager => $imager,
         };
+
+        # Add a blank page right after the cover
+        if ( $comic && $add_blank && $count == 1 ) {
+            my $page_id = sprintf 'page-%04d', $count;
+            my $page_file = catfile( $page_dir, $page_id . '.xhtml' );
+            add_blank_page( $page_id, $page_file,
+                viewport => {
+                    width => $imager->getwidth,
+                    height => $imager->getheight,
+                },
+            );
+            $pages{ $page_id } = {
+                'media-type' => 'application/xhtml+xml',
+                href => catfile( 'Text', "$page_id.xhtml" ),
+            };
+            $count++;
+        }
 
         # In comic mode, turn double-wide pages into two pages
         if ( $comic && $double{ $image } ) {
@@ -516,6 +544,12 @@ sub add_right_page {
     $img_node->setAttribute( style => 'position: absolute; right: 0' );
     $page_div->appendChild( $img_node );
 
+    $xml->toFile( $page_file );
+}
+
+sub add_blank_page {
+    my ( $page_id, $page_file, %opt ) = @_;
+    my ( $xml, $body_node ) = start_page( %opt );
     $xml->toFile( $page_file );
 }
 
