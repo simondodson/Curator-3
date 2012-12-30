@@ -90,13 +90,12 @@ sub make_epub {
     # In comic mode, try to find double-wide pages and rotated pages
     if ( $comic ) {
         # First find the most likely candidate for the height/width of the book
-        my ( @width, @height, %sizes );
+        my ( @width, @height );
         for my $img ( @images ) {
             my $imager = Imager->new( file => $img );
             next if $imager->getwidth > $imager->getheight;
             push @width, $imager->getwidth;
             push @height, $imager->getheight;
-            $sizes{ $imager->getwidth }{ $imager->getheight }++;
         }
         my $avg_width = sum( @width ) / @width;
         my $avg_height = sum( @height ) / @height;
@@ -110,12 +109,12 @@ sub make_epub {
             my $h = $imager->getheight;
             my $w = $imager->getwidth;
             # - Rotated: Height within 1 stddev of avg_width, Width within 1 stddev of avg_height
-            if ( near( $h, $avg_width, 3 * $stddev_width ) && near( $w, $avg_height, 3 * $stddev_height ) ) {
+            if ( near( $h, $avg_width, 0.05 * $avg_width ) && near( $w, $avg_height, 0.05 * $avg_height ) ) {
                 warn "  Rotated: $img \n\t(w: $w, a: $avg_width, s: $stddev_width) \n\t(h: $h, a: $avg_height, s: $stddev_height )\n";
                 $rotate{ $img }++;
             }
             # - Double: Height within 1 stddev of avg_height, Width / 2 within 5% of avg_width
-            elsif ( near( $h, $avg_height, 3 * $stddev_height ) && near( $w / 2, $avg_width, 0.05 * $avg_width ) ) {
+            elsif ( near( $h, $avg_height, 0.05 * $avg_height ) && near( $w / 2, $avg_width, 0.05 * $avg_width ) ) {
                 warn "  Double: $img \n\t(w: $w, a: $avg_width, s: $stddev_width) \n\t(h: $h, a: $avg_height, s: $stddev_height )\n";
                 $double{ $img }++;
                 # Do we need to add a blank page after the cover?
@@ -129,7 +128,7 @@ sub make_epub {
                 $count++; # Extra counter, we added two pages
             }
             # - Outlier: Height or width not within 2 stddev of avg
-            elsif ( not near( $h, $avg_height, 3 * $stddev_height ) or not near( $w, $avg_width, 3 * $stddev_width ) ) {
+            elsif ( not near( $h, $avg_height, 0.10 * $avg_height ) or not near( $w, $avg_width, 0.10 * $avg_width ) ) {
                 warn "  Outlier: $img \n\t(w: $w, a: $avg_width, s: $stddev_width) \n\t(h: $h, a: $avg_height, s: $stddev_height )\n";
             }
             $count++;
