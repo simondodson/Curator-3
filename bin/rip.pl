@@ -23,7 +23,7 @@ my $ENCODE_FOLDER	= "$ENV{HOME}/To Sort";
 
 my $MIN_TRACK_TIME	= "10";	# In minutes
 my $HANDBRAKE		= "/Applications/HandBrakeCLI";
-my $HB_PRESET		= q{"AppleTV 2"};
+my $HB_PRESET		= q{AppleTV 2};
 my $OUTPUT_FORMAT	= "m4v";
 
 my $POLL_INTERVAL	= 1200;
@@ -152,7 +152,13 @@ sub rip_dvd {
 
         # Run HandBrakeCLI
         # -5 -- Decomb if necessary
-        `nice $HANDBRAKE -v9 -i "$in_file" -t $title_number -o "$out_file" --preset="$HB_PRESET" -5 `;
+        # -F -- show forced subtitles
+        # -N eng -- Native language
+        # --native-dub -- Use native language for audio, not subtitles
+        # --subtitle scan -- Find subtitles used for less than 10% of the time
+        system 'nice', $HANDBRAKE, '-v9', '--preset', $HB_PRESET, '-5', '-F', '-N', 'eng', 
+                '--native-dub', '--subtitle', 'scan', '-i', $in_file, '-o', $out_file;
+
         # XXX: Check for failure
     }
 }
@@ -168,6 +174,12 @@ sub rip_file {
 
     # Run HandBrakeCLI
     # -5 -- Decomb if necessary
-    `nice $HANDBRAKE -v9 -i "$in_file" -o "$out_file" --preset="$HB_PRESET" -5 `;
+    # -F -- show forced subtitles
+    # -N eng -- Native language
+    # --native-dub -- Use native language for audio, not subtitles
+    # --subtitle scan -- Find subtitles used for less than 10% of the time
+    system 'nice', $HANDBRAKE, '-v9', '--preset', $HB_PRESET, '-5', '-F', '-N', 'eng', 
+            '--native-dub', '--subtitle', 'scan', '-i', $in_file, '-o', $out_file;
+
     # XXX: Check for failure
 }
