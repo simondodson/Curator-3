@@ -69,7 +69,7 @@ sub extract_pdf {
     }
     chdir $destination;
     say "PDF: Extracting $path to $destination";
-    my @limits = qw( -limit disk 50GB -limit thread 4 );
+    my @limits = qw( -limit disk 90GB -limit thread 4 );
     #capture { system 'convert', '-density', 288, '-units', 'pixelsperinch', $path, '-quality', 90, '-resize', '4000x4000>', $dest_file } and say "--- FAILED: $!";
     system 'convert', @limits, '-density', 288, '-units', 'pixelsperinch', $path, '-quality', 90, '-resize', '4000x4000>', $dest_file;
     chdir $cwd;
