@@ -62,7 +62,7 @@ sub make_epub {
     # Sort the images based on how imagemagick extracts them
     @images = map { $_->[0] }
               sort { $a->[1] <=> $b->[1] }
-              map { /(\d+)[.]\w+$/; [ $_, $1 ] }
+              map { /(\d+[.]?\d*)[.]\w+$/; [ $_, $1 ] }
               @images;
 
     my $dir = File::Temp->newdir;
@@ -86,21 +86,24 @@ sub make_epub {
         warn "No metadata file found in $source_dir\n";
     }
 
-    my ( %double, %rotate, $add_blank );
+    my ( %double, %rotate, $add_blank, $width, $height );
     # In comic mode, try to find double-wide pages and rotated pages
     if ( $comic ) {
         # First find the most likely candidate for the height/width of the book
-        my ( @width, @height );
+        my ( @width, @height, @ratios );
         for my $img ( @images ) {
             my $imager = Imager->new( file => $img );
             next if $imager->getwidth > $imager->getheight;
             push @width, $imager->getwidth;
             push @height, $imager->getheight;
+            push @ratios, $imager->getwidth / $imager->getheight;
         }
-        my $avg_width = sum( @width ) / @width;
-        my $avg_height = sum( @height ) / @height;
+        my $avg_width = $width = sum( @width ) / @width;
+        my $avg_height = $height = sum( @height ) / @height;
+        my $avg_ratio = sum( @ratios ) / @ratios;
         my $stddev_width = sqrt( sum( map { ( $_ - $avg_width ) ** 2 } @width ) / @width );
         my $stddev_height = sqrt( sum( map { ( $_ - $avg_height ) ** 2 } @height ) / @height );
+        my $stddev_ratios = sqrt( sum( map { ( $_ - $avg_ratio ) ** 2 } @ratios ) / @ratios );
 
         # Now look for outliers
         my $count = 0;
@@ -109,18 +112,21 @@ sub make_epub {
             my $h = $imager->getheight;
             my $w = $imager->getwidth;
             # - Rotated: Height within 1 stddev of avg_width, Width within 1 stddev of avg_height
-            if ( near( $h, $avg_width, 0.05 * $avg_width ) && near( $w, $avg_height, 0.05 * $avg_height ) ) {
+            if ( near( $h / $w, $avg_ratio, 0.05 * $avg_ratio ) ) {
                 warn "  Rotated: $img \n\t(w: $w, a: $avg_width, s: $stddev_width) \n\t(h: $h, a: $avg_height, s: $stddev_height )\n";
                 $rotate{ $img }++;
             }
             # - Double: Height within 1 stddev of avg_height, Width / 2 within 5% of avg_width
-            elsif ( near( $h, $avg_height, 0.05 * $avg_height ) && near( $w / 2, $avg_width, 0.05 * $avg_width ) ) {
+            # - Double: Height * 2 within 1 stddev of avg_height, Width within 5% of avg_width
+            elsif ( near( $w / 2 / $h, $avg_ratio, 0.05 * $avg_ratio ) || near( $w / ($h * 2), $avg_ratio, 0.05 * $avg_ratio ) )
+            {
                 warn "  Double: $img \n\t(w: $w, a: $avg_width, s: $stddev_width) \n\t(h: $h, a: $avg_height, s: $stddev_height )\n";
                 $double{ $img }++;
                 # Do we need to add a blank page after the cover?
                 # Odd pages are on the left, even pages are on the right
                 # If the double page starts on the right, add one just after the cover
-                if ( $count % 2 == 0 ) {
+                # Do not add a blank if we have a wraparound cover
+                if ( $count > 0 && $count % 2 == 0 ) {
                     $add_blank = 1;
                     warn "  Double page offset, need to add a blank page\n";
                     $count++; # We just added a page right after the cover
@@ -129,7 +135,9 @@ sub make_epub {
             }
             # - Outlier: Height or width not within 2 stddev of avg
             elsif ( not near( $h, $avg_height, 0.10 * $avg_height ) or not near( $w, $avg_width, 0.10 * $avg_width ) ) {
-                warn "  Outlier: $img \n\t(w: $w, a: $avg_width, s: $stddev_width) \n\t(h: $h, a: $avg_height, s: $stddev_height )\n";
+                if ( not near( $w/$h, $avg_ratio, 0.15 * $avg_ratio ) ) {
+                    warn "  Outlier: $img \n\t(w: $w, a: $avg_width, s: $stddev_width) \n\t(h: $h, a: $avg_height, s: $stddev_height )\n";
+                }
             }
             $count++;
         }
@@ -163,8 +171,8 @@ sub make_epub {
             my $page_file = catfile( $page_dir, $page_id . '.xhtml' );
             add_blank_page( $page_id, $page_file,
                 viewport => {
-                    width => $imager->getwidth,
-                    height => $imager->getheight,
+                    width => $width || $imager->getwidth,
+                    height => $height || $imager->getheight,
                 },
             );
             $pages{ $page_id } = {
@@ -183,8 +191,8 @@ sub make_epub {
                 my $page_file = catfile( $page_dir, $page_id . '.xhtml' );
                 add_right_page( $page_id, catfile( '..', $image_src ), $page_file,
                     viewport => {
-                        width => int( $imager->getwidth / 2 ),
-                        height => $imager->getheight,
+                        width => $width || int( $imager->getwidth / 2 ),
+                        height => $height || $imager->getheight,
                     },
                 );
                 $pages{ $page_id } = {
@@ -199,8 +207,8 @@ sub make_epub {
                 my $page_file = catfile( $page_dir, $page_id . '.xhtml' );
                 add_left_page( $page_id, catfile( '..', $image_src ), $page_file,
                     viewport => {
-                        width => int( $imager->getwidth / 2 ),
-                        height => $imager->getheight,
+                        width => $width || int( $imager->getwidth / 2 ),
+                        height => $height || $imager->getheight,
                     },
                 );
                 $pages{ $page_id } = {
@@ -212,8 +220,8 @@ sub make_epub {
                 $page_file = catfile( $page_dir, $page_id . '.xhtml' );
                 add_right_page( $page_id, catfile( '..', $image_src ), $page_file,
                     viewport => {
-                        width => int( $imager->getwidth / 2 ),
-                        height => $imager->getheight,
+                        width => $width || int( $imager->getwidth / 2 ),
+                        height => $height || $imager->getheight,
                     },
                 );
                 $pages{ $page_id } = {
@@ -228,8 +236,8 @@ sub make_epub {
             my $page_file = catfile( $page_dir, $page_id . '.xhtml' );
             add_page( $page_id, catfile( '..', $image_src ), $page_file,
                 viewport => {
-                    width => $imager->getwidth,
-                    height => $imager->getheight,
+                    width => $width || $imager->getwidth,
+                    height => $height || $imager->getheight,
                 },
             );
             $pages{ $page_id } = {
@@ -249,8 +257,8 @@ sub make_epub {
         my $page_file = catfile( $page_dir, $page_id . '.xhtml' );
         add_left_page( $page_id, catfile( '..', $image_src ), $page_file,
             viewport => {
-                width => int( $imager->getwidth / 2 ),
-                height => $imager->getheight,
+                width => $width || int( $imager->getwidth / 2 ),
+                height => $height || $imager->getheight,
             },
         );
         $pages{ $page_id } = {
